@@ -422,7 +422,7 @@
     };
 
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
-    import { getFirestore, doc, getDoc, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+    import { getFirestore, doc, getDoc, collection, query, where, getDocs, addDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
     import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
 
     const app = initializeApp(firebaseConfig);
@@ -435,6 +435,7 @@
 
     let quizData = null;
     let answerKey = null;
+    let quizId = null; 
     let currentQuestionIndex = 0;
     let questionStates = [];
     let userAnswers = [];
@@ -489,7 +490,7 @@
     async function startQuiz() {
         const name = $('#userName').value.trim();
         const email = $('#userEmail').value.trim();
-        const quizId = $('#quizIdInput').value.trim();
+        quizId = $('#quizIdInput').value.trim();
 
         if (!validateInputs(name, email, quizId)) return;
         setLoginLoading(true);
@@ -655,8 +656,28 @@
         $('#modal-cancel-btn').onclick = () => $('#confirm-modal-overlay').style.display = 'none';
     }
 
-    function calculateAndDisplayScore() {
+    async function calculateAndDisplayScore() {
         clearInterval(timerInterval);
+        
+        // --- SAVE ATTEMPT TO FIREBASE (START) ---
+        try {
+            const attemptData = {
+                name: $('#userName').value,
+                email: $('#userEmail').value,
+                quizId: quizId,
+                answers: userAnswers,
+                states: questionStates,
+                submittedAt: new Date()
+            };
+            
+            await addDoc(collection(db, "quizzes", quizId, "attempts"), attemptData);
+            console.log("Quiz attempt saved successfully!");
+
+        } catch (error) {
+            console.error("Error saving quiz attempt: ", error);
+        }
+        // --- SAVE ATTEMPT TO FIREBASE (END) ---
+
         let score = 0, correct = 0, incorrect = 0, unattempted = 0, qIdx = 0;
 
         quizConfig.structure.forEach(part => {
@@ -672,7 +693,7 @@
                     score += part.marks;
                     correct++;
                 } else {
-                    score -= quizConfig.negativeWeightage;
+                    score -= (part.marks * quizConfig.negativeWeightage);
                     incorrect++;
                 }
             }
