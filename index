@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Take Quiz</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* * ==============================================
+         * GLOBAL STYLES & COLOR PALETTE
+         * ==============================================
+        */
+        :root {
+            --color-save: #16a34a;        /* Green: Answered */
+            --color-review-lock: #8b5cf6; /* Violet: Answered and Marked for Review */
+            --color-review: #f59e0b;      /* Yellow: Marked for Review */
+            --color-not-answered: #ef4444; /* Red: Not Answered (Visited) */
+            --color-not-visited: #6b7280;  /* Gray: Not Visited */
+            --part-header-bg: magenta;
+        }
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+        button:disabled { background-color: #d1d5db; cursor: not-allowed; opacity: 0.7; }
+
+        /* Full-screen overlay for login */
+        #login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.6); z-index: 100; display: flex; align-items: center; justify-content: center; }
+
+        /* Main two-column layout for the quiz */
+        .quiz-container { display: flex; gap: 1.5rem; max-width: 1400px; margin: auto; padding: 1.5rem; }
+        .main-content { flex-grow: 1; }
+        .sidebar { width: 280px; flex-shrink: 0; }
+
+        /* Header for the current quiz part */
+        #part-header { background-color: var(--part-header-bg); color: white; display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.75rem; border-radius: 0.5rem 0.5rem 0 0; text-transform: uppercase; font-weight: bold; }
+
+        /* Option buttons */
+        .option-btn { border: 2px solid #e5e7eb; background-color: #ffffff; transition: all 0.2s ease; }
+        .option-btn:hover:not(:disabled) { border-color: #a5b4fc; background-color: #f9fafb; }
+        .option-btn.selected { border-color: #3b82f6; background-color: #eff6ff; color: #2563eb; font-weight: bold; }
+        .option-btn:disabled { opacity: 0.8; }
+        
+        /* * ==============================================
+         * QUESTION PALETTE STYLES
+         * ==============================================
+        */
+        .palette-part-header { background-color: #e5e7eb; padding: 0.5rem 0.75rem; border-radius: 0.25rem; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-weight: bold; margin-top: 0.5rem; }
+        .palette-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(40px, 1fr)); gap: 0.5rem; padding: 0.75rem; background-color: #ffffff; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 0.25rem 0.25rem; max-height: 200px; overflow-y: auto; transition: max-height 0.3s ease-in-out; }
+        .palette-grid.hidden { max-height: 0; padding: 0; overflow: hidden; border: none; }
+        .palette-item { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 0.25rem; font-weight: 600; color: white; cursor: pointer; transition: transform 0.1s ease, box-shadow 0.2s ease; }
+        .palette-item.current { transform: scale(1.1); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.7); z-index: 10; }
+        
+        .palette-item.not-visited { background-color: var(--color-not-visited); }
+        .palette-item.not-answered { background-color: var(--color-not-answered); }
+        .palette-item.answered { background-color: var(--color-save); }
+        .palette-item.review { background-color: var(--color-review); }
+        .palette-item.review-lock { background-color: var(--color-review-lock); }
+
+        .palette-legend { display: grid; grid-template-columns: 1fr 1fr; gap-x-4 gap-y-2; font-size: 0.8rem; }
+        .legend-item { display: flex; align-items: center; gap: 0.4rem; }
+        .legend-color-box { width: 14px; height: 14px; border-radius: 3px; }
+        
+        .btn-save { background-color: var(--color-save); }
+        .btn-review-lock { background-color: var(--color-review-lock); }
+        .btn-review { background-color: var(--color-review); }
+        .btn-clear { background-color: var(--color-not-answered); }
+
+        /* * ==============================================
+         * CALCULATOR STYLES
+         * ==============================================
+        */
+        #calculator-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 110;
+            background-color: #1f2937;
+            border-radius: 0.75rem;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            /* UPDATED: Made smaller */
+            width: 280px; 
+            padding: 0.75rem;
+            color: white;
+            display: none;
+        }
+        #calculator-header {
+            cursor: move;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #4b5563;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        #calculator-display {
+            background-color: #374151;
+            color: white;
+            border: none;
+            outline: none;
+            width: 100%;
+             /* UPDATED: Made smaller */
+            padding: 0.75rem;
+            text-align: right;
+            font-size: 1.75rem;
+            border-radius: 0.5rem;
+            margin-top: 0.75rem;
+            min-height: 60px;
+        }
+        #calculator-display::selection {
+            background-color: #6b7280;
+        }
+        /* NEW: Styles for DEG/RAD toggle */
+        #calculator-mode {
+            cursor: pointer;
+            user-select: none;
+        }
+        .calc-mode-option {
+            transition: all 0.2s ease;
+        }
+        .calc-mode-option.active {
+            color: #f59e0b; /* Amber-500 */
+            font-weight: 700;
+        }
+        #calculator-buttons {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            /* UPDATED: Made smaller */
+            gap: 0.25rem;
+            margin-top: 0.5rem;
+        }
+        .calc-btn {
+            background-color: #4b5563;
+            border-radius: 0.5rem;
+            /* UPDATED: Made smaller */
+            padding: 0.5rem;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: background-color 0.2s;
+        }
+        .calc-btn:hover { background-color: #6b7280; }
+        .calc-btn.operator { background-color: #f59e0b; }
+        .calc-btn.operator:hover { background-color: #f59e0b; filter: brightness(1.2); }
+        .calc-btn.clear-entry { background-color: #f97316; }
+        .calc-btn.clear-entry:hover { background-color: #f97316; filter: brightness(1.2); }
+    </style>
+</head>
+<body>
+    <div id="login-overlay">
+        <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-sm text-center">
+            <h2 class="text-2xl font-bold mb-6">Enter Quiz</h2>
+            <div class="space-y-4 text-left">
+                <div>
+                    <label for="userName" class="block text-sm font-medium text-gray-700">Name</label>
+                    <input type="text" id="userName" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm" placeholder="e.g., John Doe">
+                </div>
+                <div>
+                    <label for="userEmail" class="block text-sm font-medium text-gray-700">Email Address</label>
+                    <input type="email" id="userEmail" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm" placeholder="e.g., john.doe@example.com">
+                </div>
+                <div>
+                    <label for="quizIdInput" class="block text-sm font-medium text-gray-700">Quiz ID</label>
+                    <input type="text" id="quizIdInput" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm" placeholder="Enter the ID provided by your instructor">
+                </div>
+            </div>
+            <button id="startQuizBtn" class="mt-8 w-full bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-indigo-700" disabled>Connecting...</button>
+            <div id="loginError" class="mt-4 text-red-600 font-medium" style="display:none;"></div>
+        </div>
+    </div>
+
+    <div class="quiz-container" style="display: none;">
+        <div class="main-content">
+            <div class="bg-white rounded-lg shadow border border-gray-200">
+                <div id="part-header">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                    <span id="part-name-display">Part Name</span>
+                </div>
+                <div class="p-6">
+                    <p id="question-number-display" class="text-xl font-bold text-gray-800 mb-4"></p>
+                    <div id="question-content" class="mb-6 flex justify-center items-center min-h-[300px] md:min-h-[400px] bg-gray-50 rounded-lg p-2 border border-gray-200 overflow-hidden">
+                        <img id="question-image" src="" alt="Question Content" class="max-w-full max-h-full object-contain">
+                    </div>
+                    <div id="options-container" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                        <button class="option-btn p-4 rounded-lg text-lg font-semibold flex items-center justify-center" data-option="A">A</button>
+                        <button class="option-btn p-4 rounded-lg text-lg font-semibold flex items-center justify-center" data-option="B">B</button>
+                        <button class="option-btn p-4 rounded-lg text-lg font-semibold flex items-center justify-center" data-option="C">C</button>
+                        <button class="option-btn p-4 rounded-lg text-lg font-semibold flex items-center justify-center" data-option="D">D</button>
+                    </div>
+                    <div id="reviewBox" class="mt-4 p-3 rounded-lg text-center font-medium" style="display: none;"></div>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6 pt-6 border-t">
+                        <button id="reviewBtn" class="w-full text-white font-bold py-2 px-4 rounded-lg btn-review justify-center">Review</button>
+                        <button id="reviewLockBtn" class="w-full text-white font-bold py-2 px-4 rounded-lg btn-review-lock justify-center">Review & Lock</button>
+                        <button id="clearBtn" class="w-full text-white font-bold py-2 px-4 rounded-lg btn-clear justify-center">Clear</button>
+                        <button id="saveBtn" class="w-full text-white font-bold py-2 px-4 rounded-lg btn-save justify-center">Save & Next</button>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <button id="prevBtn" class="bg-gray-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-gray-700">Previous</button>
+                        <button id="nextBtn" class="bg-gray-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-gray-700">Next</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="sidebar space-y-6">
+            <div class="bg-white rounded-lg shadow border border-gray-200">
+                <div class="p-4 relative">
+                    <h3 id="sidebarStudentName" class="font-bold text-lg text-gray-900 truncate">Student Name</h3>
+                    <p class="text-sm text-gray-500">Quiz ID: <span id="sidebarQuizId" class="font-mono"></span></p>
+                    <button id="calculatorBtn" class="absolute top-3 right-3 bg-gray-200 text-gray-700 p-2 rounded-full hover:bg-gray-300">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="4" y="2" width="16" height="20" rx="2"></rect><path d="M8 6h8"></path><path d="M8 10h.01"></path><path d="M12 10h.01"></path><path d="M16 10h.01"></path><path d="M8 14h.01"></path><path d="M12 14h.01"></path><path d="M16 14h.01"></path><path d="M8 18h8"></path>
+                        </svg>
+                    </button>
+                </div>
+                <div id="timer" class="text-center bg-gray-800 text-white p-3 rounded-b-lg">
+                    <p class="text-xs uppercase tracking-wider">Time Remaining</p>
+                    <p id="timeDisplay" class="text-3xl font-bold tracking-wider">00:00:00</p>
+                </div>
+            </div>
+            <div id="palette-container" class="bg-white rounded-lg shadow border border-gray-200 p-4">
+                <h3 class="font-bold text-lg mb-3">Question Palette</h3>
+                <div class="palette-legend mb-4">
+                    <div class="legend-item"><div class="legend-color-box" style="background-color: var(--color-save);"></div>Answered</div>
+                    <div class="legend-item"><div class="legend-color-box" style="background-color: var(--color-not-answered);"></div>Not Answered</div>
+                    <div class="legend-item"><div class="legend-color-box" style="background-color: var(--color-review);"></div>Review</div>
+                    <div class="legend-item"><div class="legend-color-box" style="background-color: var(--color-review-lock);"></div>Review & Lock</div>
+                    <div class="legend-item col-span-2"><div class="legend-color-box" style="background-color: var(--color-not-visited);"></div>Not Visited</div>
+                </div>
+                <div id="palette-parts-container"></div>
+            </div>
+            <button id="finalSubmitBtn" class="w-full bg-purple-700 text-white font-bold py-3 px-4 rounded-lg hover:bg-purple-800">Submit Quiz</button>
+        </div>
+    </div>
+
+    <div id="confirm-modal-overlay" class="fixed top-0 left-0 w-full h-full bg-black bg-opacity-60 z-[100] flex items-center justify-center" style="display: none;">
+        <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-md text-center">
+            <h3 id="confirm-modal-title" class="text-xl font-bold mb-4">Confirm Submission</h3>
+            <p id="confirm-modal-text" class="mb-6 text-gray-700"></p>
+            <div class="flex justify-center gap-4">
+                <button id="modal-cancel-btn" class="px-6 py-2 bg-gray-300 rounded-lg font-medium hover:bg-gray-400">Cancel</button>
+                <button id="modal-confirm-btn" class="px-6 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700">Submit</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="calculator-modal">
+        <div id="calculator-header">
+            <span class="font-bold">Calculator</span>
+            <button id="close-calculator-btn" class="text-2xl">&times;</button>
+        </div>
+        <input type="text" id="calculator-display" value="0">
+        <!-- NEW: DEG/RAD Toggle -->
+        <div id="calculator-mode" class="text-xs text-gray-400 mt-2 px-1 flex justify-end items-center gap-2">
+            <span class="calc-mode-option active" data-mode="deg">DEG</span>
+            <span class="calc-mode-option" data-mode="rad">RAD</span>
+        </div>
+        <div id="calculator-buttons">
+            <!-- UPDATED: New layout with x^2, 00 -->
+            <button class="calc-btn operator" data-value="sin">sin</button>
+            <button class="calc-btn operator" data-value="cos">cos</button>
+            <button class="calc-btn operator" data-value="tan">tan</button>
+            <button class="calc-btn operator" data-value="log">log</button>
+            <button class="calc-btn operator" data-value="ln">ln</button>
+
+            <button class="calc-btn operator" data-value="x-squared">x²</button>
+            <button class="calc-btn operator" data-value="^">x<sup>y</sup></button>
+            <button class="calc-btn operator" data-value="pi">π</button>
+            <button class="calc-btn operator" data-value="sqrt">√</button>
+            <button class="calc-btn clear-entry" data-value="CE">CE</button>
+            
+            <button class="calc-btn" data-value="7">7</button>
+            <button class="calc-btn" data-value="8">8</button>
+            <button class="calc-btn" data-value="9">9</button>
+            <button class="calc-btn operator" data-value="/">/</button>
+            <button class="calc-btn" data-value="backspace">Bksp</button>
+            
+            <button class="calc-btn" data-value="4">4</button>
+            <button class="calc-btn" data-value="5">5</button>
+            <button class="calc-btn" data-value="6">6</button>
+            <button class="calc-btn operator" data-value="*">*</button>
+            <button class="calc-btn" data-value="move-left">←</button>
+            
+            <button class="calc-btn" data-value="1">1</button>
+            <button class="calc-btn" data-value="2">2</button>
+            <button class="calc-btn" data-value="3">3</button>
+            <button class="calc-btn operator" data-value="-">-</button>
+            <button class="calc-btn" data-value="move-right">→</button>
+            
+            <button class="calc-btn" data-value="00">00</button>
+            <button class="calc-btn" data-value="0">0</button>
+            <button class="calc-btn" data-value=".">.</button>
+            <button class="calc-btn operator" data-value="+">+</button>
+            <button class="calc-btn operator" data-value="=">=</button>
+        </div>
+    </div>
+
+
+<script type="module">
+    // ===================================================================================
+    //                                  FIREBASE SETUP
+    // ===================================================================================
+    const firebaseConfig = {
+        apiKey: "AIzaSyCtqTUgcNmEVpomhPOozHA_3iw4ZnaCJug",
+        authDomain: "quiz-3d72e.firebaseapp.com",
+        projectId: "quiz-3d72e",
+        storageBucket: "quiz-3d72e.appspot.com",
+        messagingSenderId: "843152315174",
+        appId: "1:843152315174:web:e90ae825078e7d0c7ae7e7"
+    };
+
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
+    import { getFirestore, doc, getDoc, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+    import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+    
+    // ===================================================================================
+    //                                  APPLICATION LOGIC
+    // ===================================================================================
+
+    let quizData = null;
+    let answerKey = null;
+    let currentQuestionIndex = 0;
+    let questionStates = [];
+    let userAnswers = [];
+    let timerInterval = null;
+    let quizConfig = {};
+    const ADMIN_EMAIL = "ahamedizaz400@gmail.com";
+
+    const $ = (selector) => document.querySelector(selector);
+
+    // --- Authentication ---
+    (async () => {
+        try {
+            await signInAnonymously(auth);
+            $('#startQuizBtn').disabled = false;
+            $('#startQuizBtn').textContent = 'Start Quiz';
+        } catch (error) {
+            console.error("Firebase sign-in failed:", error);
+            $('#startQuizBtn').textContent = 'Connection Failed';
+            $('#loginError').textContent = 'Could not connect. Please check internet.';
+            $('#loginError').style.display = 'block';
+        }
+    })();
+
+    // --- Event Listeners ---
+    $('#startQuizBtn').addEventListener('click', startQuiz);
+    $('#prevBtn').addEventListener('click', () => navigate(-1));
+    $('#nextBtn').addEventListener('click', () => navigate(1));
+    $('#saveBtn').addEventListener('click', handleSave);
+    $('#reviewBtn').addEventListener('click', handleReview);
+    $('#reviewLockBtn').addEventListener('click', handleReviewLock);
+    $('#clearBtn').addEventListener('click', handleClear);
+    $('#finalSubmitBtn').addEventListener('click', confirmSubmit);
+
+    $('#options-container').addEventListener('click', (e) => {
+        const button = e.target.closest('.option-btn');
+        if (button && !questionStates[currentQuestionIndex].locked) {
+            userAnswers[currentQuestionIndex] = button.dataset.option;
+            if (['not-answered', 'not-visited'].includes(questionStates[currentQuestionIndex].status)) {
+                 questionStates[currentQuestionIndex].status = 'answered';
+            }
+            updateQuestionUI();
+        }
+    });
+
+    // --- Quiz Core ---
+    async function startQuiz() {
+        const name = $('#userName').value.trim();
+        const email = $('#userEmail').value.trim();
+        const quizId = $('#quizIdInput').value.trim();
+
+        if (!validateInputs(name, email, quizId)) return;
+        setLoginLoading(true);
+
+        try {
+            const quizDoc = await getDoc(doc(db, "quizzes", quizId));
+            if (!quizDoc.exists()) throw new Error("Invalid Quiz ID.");
+            
+            quizData = quizDoc.data();
+            answerKey = quizData.answerKey || {};
+            quizConfig = {
+                duration: quizData.duration || 180,
+                negativeWeightage: quizData.negativeWeightage || 0,
+                structure: quizData.structure || []
+            };
+
+            if (email !== ADMIN_EMAIL) {
+                const q = query(collection(db, "quizzes", quizId, "attempts"), where("email", "==", email));
+                const querySnapshot = await getDocs(q);
+                if (!querySnapshot.empty) throw new Error("You have already attempted this quiz.");
+            }
+            
+            initializeQuizState(quizData.questions.length);
+            buildPalette(quizConfig.structure);
+            
+            $('#sidebarStudentName').textContent = name;
+            $('#sidebarQuizId').textContent = quizId;
+            $('#login-overlay').style.display = 'none';
+            $('.quiz-container').style.display = 'flex';
+            
+            displayQuestion(0);
+            startTimer(quizConfig.duration);
+
+        } catch (err) {
+            handleLoginError(err);
+        } finally {
+            setLoginLoading(false);
+        }
+    }
+
+    function initializeQuizState(qCount) {
+        userAnswers = Array(qCount).fill(null);
+        questionStates = Array(qCount).fill(null).map(() => ({ status: 'not-visited', locked: false }));
+    }
+
+    function displayQuestion(index) {
+        currentQuestionIndex = index;
+        if (questionStates[index].status === 'not-visited') {
+            questionStates[index].status = 'not-answered';
+        }
+        const imgUrl = (quizData.questions[index] || "").match(/\((.*?)\)/); 
+        $('#question-image').src = imgUrl ? imgUrl[1] : '';
+        $('#question-number-display').textContent = `Question ${index + 1}`;
+        updatePartHeader(index);
+        updateQuestionUI();
+    }
+    
+    // --- UI Updates ---
+    function updateQuestionUI() {
+        const state = questionStates[currentQuestionIndex];
+        const answer = userAnswers[currentQuestionIndex];
+        document.querySelectorAll('.option-btn').forEach(btn => {
+            btn.classList.toggle('selected', btn.dataset.option === answer);
+            btn.disabled = state.locked;
+        });
+        $('#prevBtn').disabled = currentQuestionIndex === 0;
+        $('#nextBtn').disabled = currentQuestionIndex === quizData.questions.length - 1;
+        ['#saveBtn', '#clearBtn', '#reviewBtn', '#reviewLockBtn'].forEach(sel => $(sel).disabled = state.locked);
+        updatePalette();
+        updateReviewBox(state);
+    }
+
+    function updatePalette() {
+        questionStates.forEach((state, index) => {
+            const item = $(`#q-palette-${index + 1}`);
+            if (item) {
+                item.className = 'palette-item';
+                item.classList.add(state.status);
+                item.classList.toggle('current', index === currentQuestionIndex);
+            }
+        });
+    }
+    
+    function buildPalette(parts) {
+        const container = $('#palette-parts-container');
+        container.innerHTML = '';
+        let qIndexOffset = 0;
+        parts.forEach((part, partIndex) => {
+            const partId = `part-palette-${partIndex}`;
+            const header = document.createElement('div');
+            header.className = 'palette-part-header';
+            header.innerHTML = `<span>${part.name}</span><span id="arrow-${partId}">▼</span>`;
+            header.onclick = () => {
+                $(`#${partId}`).classList.toggle('hidden');
+                $(`#arrow-${partId}`).textContent = $(`#${partId}`).classList.contains('hidden') ? '►' : '▼';
+            };
+            const grid = document.createElement('div');
+            grid.className = 'palette-grid';
+            grid.id = partId;
+            for (let i = 0; i < part.count; i++) {
+                const qNum = qIndexOffset + i + 1;
+                const item = document.createElement('div');
+                item.className = 'palette-item';
+                item.id = `q-palette-${qNum}`;
+                item.textContent = qNum;
+                item.onclick = () => displayQuestion(qNum - 1);
+                grid.appendChild(item);
+            }
+            container.appendChild(header);
+            container.appendChild(grid);
+            qIndexOffset += part.count;
+        });
+    }
+    
+    function updatePartHeader(index) {
+        let qCounter = 0;
+        for (const part of quizConfig.structure) {
+            if (index < qCounter + part.count) {
+                $('#part-name-display').textContent = part.name;
+                return;
+            }
+            qCounter += part.count;
+        }
+    }
+    
+    function updateReviewBox(state) {
+        const box = $('#reviewBox');
+        let msg = '', color = '';
+        switch (state.status) {
+            case 'review': msg = 'Marked for review.'; color = 'bg-yellow-100 text-yellow-800'; break;
+            case 'review-lock': msg = 'ANSWER LOCKED. Marked for review.'; color = 'bg-purple-100 text-purple-800'; break;
+            default: box.style.display = 'none'; return;
+        }
+        box.textContent = msg;
+        box.className = `mt-4 p-3 rounded-lg text-center font-medium ${color}`;
+        box.style.display = 'block';
+    }
+
+    // --- Actions ---
+    function handleSave() { if (!userAnswers[currentQuestionIndex]) return; questionStates[currentQuestionIndex].status = 'answered'; navigate(1); }
+    function handleReview() { questionStates[currentQuestionIndex].status = 'review'; navigate(1); }
+    function handleReviewLock() { if (!userAnswers[currentQuestionIndex]) return; questionStates[currentQuestionIndex] = { status: 'review-lock', locked: true }; navigate(1); }
+    function handleClear() { userAnswers[currentQuestionIndex] = null; questionStates[currentQuestionIndex].status = 'not-answered'; updateQuestionUI(); }
+    function navigate(dir) { const newIndex = currentQuestionIndex + dir; if (newIndex >= 0 && newIndex < quizData.questions.length) displayQuestion(newIndex); }
+
+    // --- Submission ---
+    function confirmSubmit() {
+        const unattempted = questionStates.filter(q => ['not-answered', 'not-visited'].includes(q.status)).length;
+        $('#confirm-modal-text').textContent = `Are you sure you want to submit? ${unattempted > 0 ? `You have ${unattempted} unanswered questions.` : ''}`;
+        $('#confirm-modal-overlay').style.display = 'flex';
+        $('#modal-confirm-btn').onclick = () => { $('#confirm-modal-overlay').style.display = 'none'; calculateAndDisplayScore(); };
+        $('#modal-cancel-btn').onclick = () => $('#confirm-modal-overlay').style.display = 'none';
+    }
+
+    function calculateAndDisplayScore() {
+        clearInterval(timerInterval);
+        let score = 0, correct = 0, incorrect = 0, unattempted = 0, qIdx = 0;
+
+        quizConfig.structure.forEach(part => {
+            for (let i = 0; i < part.count; i++) {
+                const idx = qIdx + i;
+                if (userAnswers[idx] === null) unattempted++;
+                else if (userAnswers[idx] === answerKey[idx + 1]) { score += part.marks; correct++; }
+                else { score -= quizConfig.negativeWeightage; incorrect++; }
+            }
+            qIdx += part.count;
+        });
+
+        let keyHtml = '<h3 class="text-xl font-bold mt-8 mb-4 text-left">Answer Key</h3><div class="space-y-2 text-left">';
+        userAnswers.forEach((ans, i) => {
+            const correctAns = answerKey[i + 1];
+            const isCorrect = ans === correctAns;
+            keyHtml += `<div class="p-2 rounded-md ${isCorrect ? 'bg-green-50' : 'bg-red-50'}"><span class="font-bold">Q ${i + 1}:</span> Your Answer: <span class="font-semibold ${isCorrect ? 'text-green-600' : 'text-red-600'}">${ans || "N/A"}</span> | Correct: <span class="font-semibold text-blue-600">${correctAns}</span></div>`;
+        });
+        keyHtml += '</div>';
+
+        $('.main-content').innerHTML = `<div class="bg-white rounded-lg shadow p-8"><div class="text-center"><h2 class="text-3xl font-bold">Quiz Completed!</h2><p class="text-lg text-gray-600 my-2">Name: ${$('#userName').value}</p><div class="my-6"><p class="text-5xl font-extrabold text-indigo-600">${score.toFixed(2)}</p><p>Final Score</p></div><div class="grid grid-cols-3 gap-4 text-center border-y py-4 my-6"><div><p class="text-2xl font-bold text-green-600">${correct}</p><p>Correct</p></div><div><p class="text-2xl font-bold text-red-600">${incorrect}</p><p>Incorrect</p></div><div><p class="text-2xl font-bold text-gray-600">${unattempted}</p><p>Unattempted</p></div></div></div>${keyHtml}</div>`;
+        $('.sidebar').style.display = 'none';
+    }
+    
+    // --- Utilities ---
+    function startTimer(minutes) {
+        let secs = minutes * 60;
+        timerInterval = setInterval(() => {
+            if (secs <= 0) { clearInterval(timerInterval); alert("Time's up!"); calculateAndDisplayScore(); return; }
+            secs--;
+            $('#timeDisplay').textContent = `${String(Math.floor(secs / 3600)).padStart(2, '0')}:${String(Math.floor((secs % 3600) / 60)).padStart(2, '0')}:${String(secs % 60).padStart(2, '0')}`;
+        }, 1000);
+    }
+    function validateInputs(name, email, quizId) { const e = (m) => { $('#loginError').textContent = m; $('#loginError').style.display = 'block'; }; if (!name || !email || !quizId) { e("All fields are required."); return false; } if (!/^\S+@\S+\.\S+$/.test(email)) { e("Invalid email."); return false; } return true; }
+    function handleLoginError(err) { console.error(err); $('#loginError').textContent = err.message; $('#loginError').style.display = 'block'; setLoginLoading(false); }
+    function setLoginLoading(isLoading) { $('#startQuizBtn').disabled = isLoading; $('#startQuizBtn').textContent = isLoading ? 'Loading...' : 'Start Quiz'; }
+
+    // ===================================================================================
+    //                          CSIR NET CALCULATOR LOGIC
+    // ===================================================================================
+    const calculator = $('#calculator-modal');
+    const display = $('#calculator-display');
+    let calcState = { previous: null, operation: null, newEntry: true, isRadianMode: false };
+
+    const syncState = () => { calcState.current = display.value; };
+    display.addEventListener('input', syncState);
+
+    function resetCalculator() {
+        calcState.previous = null;
+        calcState.operation = null;
+        clearEntry();
+    }
+    function clearEntry() {
+        display.value = '0';
+        calcState.newEntry = true;
+        syncState();
+    }
+    function insertAtCursor(text) {
+        if (calcState.newEntry) {
+            display.value = ''; 
+            calcState.newEntry = false;
+        }
+        const start = display.selectionStart;
+        const end = display.selectionEnd;
+        const current = display.value;
+        
+        let newValue = current.substring(0, start) + text + current.substring(end);
+        
+        display.value = newValue;
+        display.selectionStart = display.selectionEnd = start + text.length;
+        display.focus();
+        syncState();
+    }
+    function performOperation() {
+        const prev = parseFloat(calcState.previous);
+        const curr = parseFloat(display.value);
+        if (isNaN(prev) || isNaN(curr)) return;
+        let result = 0;
+        switch (calcState.operation) {
+            case '+': result = prev + curr; break;
+            case '-': result = prev - curr; break;
+            case '*': result = prev * curr; break;
+            case '/': result = prev / curr; break;
+            case '^': result = Math.pow(prev, curr); break;
+        }
+        display.value = String(result);
+        calcState.operation = null;
+        calcState.previous = null;
+        syncState();
+    }
+    function chooseOperation(op) {
+        if (!calcState.newEntry && calcState.previous !== null) {
+             performOperation(); 
+        }
+        calcState.previous = display.value;
+        calcState.operation = op;
+        calcState.newEntry = true;
+    }
+    function handleScientific(func) {
+        const val = parseFloat(display.value);
+        let result = 0;
+        switch(func) {
+            case 'sin': result = calcState.isRadianMode ? Math.sin(val) : Math.sin(val * (Math.PI / 180)); break;
+            case 'cos': result = calcState.isRadianMode ? Math.cos(val) : Math.cos(val * (Math.PI / 180)); break;
+            case 'tan': result = calcState.isRadianMode ? Math.tan(val) : Math.tan(val * (Math.PI / 180)); break;
+            case 'log': result = Math.log10(val); break;
+            case 'ln': result = Math.log(val); break;
+            case 'sqrt': result = Math.sqrt(val); break;
+            case 'x-squared': result = Math.pow(val, 2); break;
+            case 'pi': result = Math.PI; break;
+        }
+        display.value = String(result);
+        calcState.newEntry = true;
+        syncState();
+    }
+    function backspace() {
+        const start = display.selectionStart;
+        const end = display.selectionEnd;
+        if (start === end && start > 0) {
+            display.value = display.value.substring(0, start - 1) + display.value.substring(end);
+            display.selectionStart = display.selectionEnd = start - 1;
+        } else {
+            display.value = display.value.substring(0, start) + display.value.substring(end);
+            display.selectionStart = display.selectionEnd = start;
+        }
+        if(display.value === '') display.value = '0';
+        display.focus();
+        syncState();
+    }
+    function moveCursor(dir) {
+        const newPosition = display.selectionStart + dir;
+        if (newPosition >= 0 && newPosition <= display.value.length) {
+            display.selectionStart = newPosition;
+            display.selectionEnd = newPosition;
+        }
+        display.focus();
+    }
+    
+    // --- Calculator Event Listeners ---
+    $('#calculator-mode').addEventListener('click', (e) => {
+        const target = e.target.closest('.calc-mode-option');
+        if (!target) return;
+        calcState.isRadianMode = target.dataset.mode === 'rad';
+        document.querySelector('.calc-mode-option.active').classList.remove('active');
+        target.classList.add('active');
+    });
+
+    $('#calculator-buttons').addEventListener('click', (e) => {
+        const target = e.target.closest('.calc-btn');
+        if (!target) return;
+        const { value } = target.dataset;
+        const type = target.classList;
+
+        if (value === 'CE') clearEntry();
+        else if (value === 'backspace') backspace();
+        else if (value === 'move-left') moveCursor(-1);
+        else if (value === 'move-right') moveCursor(1);
+        else if (value === '=') {
+            if (calcState.operation && calcState.previous !== null) {
+                performOperation();
+                calcState.newEntry = true;
+            }
+        }
+        else if (type.contains('operator')) {
+             if (['sin', 'cos', 'tan', 'log', 'ln', 'sqrt', 'pi', 'x-squared'].includes(value)) handleScientific(value);
+             else chooseOperation(value);
+        }
+        else insertAtCursor(value);
+    });
+    
+    // --- Draggable Calculator ---
+    let isDragging = false, offset = { x: 0, y: 0 };
+    $('#calculatorBtn').addEventListener('click', () => calculator.style.display = 'block');
+    $('#close-calculator-btn').addEventListener('click', () => calculator.style.display = 'none');
+    $('#calculator-header').addEventListener('mousedown', (e) => {
+        isDragging = true;
+        offset = { x: e.clientX - calculator.offsetLeft, y: e.clientY - calculator.offsetTop };
+    });
+    document.addEventListener('mouseup', () => isDragging = false);
+    document.addEventListener('mousemove', (e) => {
+        if (isDragging) {
+            calculator.style.left = `${e.clientX - offset.x}px`;
+            calculator.style.top = `${e.clientY - offset.y}px`;
+        }
+    });
+
+</script>
+</body>
+</html>
+
