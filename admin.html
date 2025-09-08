@@ -67,11 +67,11 @@
   <div class="mb-6">
     <h2 class="text-xl font-semibold text-gray-700 mb-4">3. Upload Paper</h2>
     <div>
-      <label for="questionFile" class="block text-sm font-medium text-gray-700 mb-1">Question Paper (.pdf)</label>
+      <label for="questionFile" class="block text-sm font-medium text-gray-700 mb-1">Question Paper (.pdf, .txt, .md)</label>
       <label class="w-full flex items-center px-4 py-2 bg-white text-blue-500 rounded-lg shadow-sm tracking-wide uppercase border border-blue-500 cursor-pointer hover:bg-blue-500 hover:text-white">
         <svg class="w-6 h-6 mr-2" fill="currentColor" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M16.88 9.1A4 4 0 0 1 16 17H5a5 5 0 0 1-1-9.9V7a3 3 0 0 1 4.52-2.59A4.98 4.98 0 0 1 17 8c0 .38-.04.74-.12 1.1zM11 11h3l-4 4-4-4h3V3h2v8z" /></svg>
         <span id="fileName" class="truncate">Select a file</span>
-        <input type='file' id="questionFile" class="hidden" accept=".pdf"/>
+        <input type='file' id="questionFile" class="hidden" accept=".txt,.md,.pdf"/>
       </label>
     </div>
   </div>
@@ -88,26 +88,25 @@
   <h1 class="text-2xl font-bold text-gray-800 mb-2">Preview & Construct Questions</h1>
   <div class="p-4 bg-yellow-50 border-l-4 border-yellow-400 text-yellow-800 mb-4 rounded-r-lg">
     <p class="font-bold">Instructions</p>
-    <p class="mt-1">Use your **left mouse button** to drag a box over a question. Release to automatically capture and add it to the list. For pasted images, use **right-click** or press **Enter** to add.</p>
+    <p class="mt-1">Click "Select Question Area" to enable crop mode. Click and drag over a question in the PDF preview to capture it. The captured image will appear in the Question Constructor.</p>
   </div>
   <div class="grid grid-cols-1 md:grid-cols-2 gap-6 h-[75vh]">
     <div class="flex flex-col">
         <div class="flex justify-between items-center mb-2">
              <h3 class="font-bold text-lg">PDF Preview</h3>
+             <button id="cropModeBtn" class="bg-green-500 text-white font-bold py-1 px-3 rounded-lg hover:bg-green-600 text-sm">Select Question Area</button>
         </div>
       	<div id="pdf-preview" class="relative border rounded-md p-2 overflow-auto bg-gray-50 flex-grow">
-      	    <div id="pdf-preview-pages" class="relative">
-                 <!-- Canvases will be added here -->
-                 <div id="crop-overlay" style="position: absolute; top:0; left: 0; width: 100%; height: 100%; cursor: crosshair;">
-                    <canvas id="crop-visualizer" style="position: absolute; top: 0; left: 0;"></canvas>
-                </div>
+      	    <div id="pdf-preview-pages"></div>
+            <div id="crop-overlay" style="display: none;">
+                <canvas id="crop-visualizer" style="position: absolute; top: 0; left: 0;"></canvas>
             </div>
       	</div>
     </div>
     <div id="text-editor" class="flex flex-col">
       <div id="question-constructor" class="mb-4 p-4 border rounded-lg bg-gray-50">
         <h3 class="font-bold text-lg mb-2">Question Constructor</h3>
-        <p class="text-sm text-gray-600 mb-4">The captured image will appear below. You can also paste an image directly (`Ctrl+V`).</p>
+        <p class="text-sm text-gray-600 mb-4">After selecting an area, the image will appear below. You can also paste an image directly (Ctrl+V). Click "Add Question" to add it to the list.</p>
         <div id="paste-zone" class="w-full h-24 rounded-lg flex items-center justify-center text-gray-500 bg-white cursor-pointer border-2 border-dashed border-gray-300" tabindex="0">
           <p id="paste-text">Image will appear here after selection</p>
           <img id="paste-preview" class="max-h-full max-w-full" style="display:none;" />
@@ -118,7 +117,7 @@
       <textarea id="finalQuestionsText" class="w-full h-full p-2 border border-gray-300 rounded-md flex-grow"></textarea>
       <div class="mt-4">
         <label for="answerKey" class="block text-sm font-medium text-gray-700 mb-1">Answer Key (Required)</label>
-        <textarea id="answerKey" rows="1" class="w-full p-2 border border-gray-300 rounded-md" placeholder="e.g., BADC... (no spaces or commas)"></textarea>
+        <textarea id="answerKey" rows="3" class="w-full p-2 border border-gray-300 rounded-md" placeholder="Enter answers in order, separated by commas. e.g., B,A,D,C,..."></textarea>
       </div>
     </div>
   </div>
@@ -177,13 +176,12 @@
 
   let currentQuestionNumber = 1;
   let pastedImageAsBase64 = null;
-  let isFromCrop = false; // Flag to check if image is from cropping tool
 
   const $ = (selector) => document.querySelector(selector);
 
   function showScreen(screenId) {
     ['upload-section', 'correction-section', 'result-section'].forEach(id => {
-      $(`#${id}`).style.display = (id === screenId) ? (id === 'upload-section' ? 'block' : 'block') : 'none';
+      $(#${id}).style.display = (id === screenId) ? (id === 'upload-section' ? 'block' : 'block') : 'none';
     });
   }
 
@@ -195,7 +193,7 @@
 
   function showModal(message, onConfirm) {
     $('#modal-text').textContent = message;
-    $('#modal-actions').innerHTML = `<button id="modal-cancel" class="w-1/2 bg-gray-300 font-bold py-2 px-4 rounded-lg">Cancel</button><button id="modal-confirm" class="w-1/2 bg-red-600 text-white font-bold py-2 px-4 rounded-lg">Confirm</button>`;
+    $('#modal-actions').innerHTML = <button id="modal-cancel" class="w-1/2 bg-gray-300 font-bold py-2 px-4 rounded-lg">Cancel</button><button id="modal-confirm" class="w-1/2 bg-red-600 text-white font-bold py-2 px-4 rounded-lg">Confirm</button>;
     $('#custom-modal-overlay').style.display = 'flex';
     $('#modal-confirm').onclick = () => { $('#custom-modal-overlay').style.display = 'none'; onConfirm(); };
     $('#modal-cancel').onclick = () => { $('#custom-modal-overlay').style.display = 'none'; };
@@ -239,7 +237,8 @@
 
     try {
       const file = $('#questionFile').files[0];
-      await parsePdf(file);
+      const textContent = await (file.type === 'application/pdf' ? parsePdf(file) : readTextFile(file));
+      $('#finalQuestionsText').value = textContent;
       showScreen('correction-section');
     } catch (err) {
       showError(err.message);
@@ -261,7 +260,7 @@
       return;
     }
     if(constructedQs.length !== expectedTotal) {
-      showError(`Mismatch: Expected ${expectedTotal} questions based on your settings, but found ${constructedQs.length}. Please correct the structure or add/remove questions.`, true);
+      showError(Mismatch: Expected ${expectedTotal} questions based on your settings, but found ${constructedQs.length}. Please correct the structure or add/remove questions., true);
       return;
     }
 
@@ -308,18 +307,32 @@
   });
 
   async function parsePdf(file) {
+    await renderPdfPreview(file);
+    return ""; // For PDFs, we expect manual construction.
+  }
+
+  function readTextFile(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target.result);
+      reader.onerror = () => reject(new Error('Failed to read file.'));
+      reader.readAsText(file);
+    });
+  }
+
+  async function renderPdfPreview(file) {
     const reader = new FileReader();
     reader.readAsArrayBuffer(file);
     return new Promise((resolve, reject) => {
       reader.onload = async (e) => {
         try {
-          pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js`;
+          pdfjsLib.GlobalWorkerOptions.workerSrc = https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js;
           const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(e.target.result) }).promise;
           const container = $('#pdf-preview-pages');
           container.innerHTML = '';
           for (let i = 1; i <= pdf.numPages; i++) {
             const page = await pdf.getPage(i);
-            const viewport = page.getViewport({ scale: 7.0 }); // Even higher scale for best quality
+            const viewport = page.getViewport({ scale: 3.0 }); // Increased scale for better quality
             const canvas = document.createElement('canvas');
             canvas.height = viewport.height;
             canvas.width = viewport.width;
@@ -332,26 +345,7 @@
       reader.onerror = () => reject(new Error('Failed to read PDF.'));
     });
   }
-    
-  function addPastedQuestion() {
-    if (!pastedImageAsBase64) { return; }
 
-    const markdownString = `**Q${currentQuestionNumber}.**\n![Question ${currentQuestionNumber}](${pastedImageAsBase64})\n`;
-    const textArea = $('#finalQuestionsText');
-    const currentText = textArea.value;
-    // Add separator only if there's existing content
-    textArea.value += (currentText.length > 0 && currentText.trim() !== '' ? '\n---\n\n' : '') + markdownString;
-    textArea.scrollTop = textArea.scrollHeight;
-
-    currentQuestionNumber++;
-    $('#currentQNumLabel').textContent = currentQuestionNumber;
-    pastedImageAsBase64 = null;
-    isFromCrop = false;
-    $('#paste-preview').style.display = 'none';
-    $('#paste-text').style.display = 'block';
-    $('#paste-preview').src = '';
-  }
-  
   $('#paste-zone').addEventListener('paste', (e) => {
     e.preventDefault();
     const item = e.clipboardData.items[0];
@@ -360,7 +354,6 @@
       const reader = new FileReader();
       reader.onload = function(event) {
         pastedImageAsBase64 = event.target.result;
-        isFromCrop = false;
         $('#paste-preview').src = pastedImageAsBase64;
         $('#paste-preview').style.display = 'block';
         $('#paste-text').style.display = 'none';
@@ -371,12 +364,23 @@
 
   $('#addQuestionBtn').addEventListener('click', () => {
     if (!pastedImageAsBase64) { alert('Please select an area or paste an image first.'); return; }
-    addPastedQuestion();
+
+    const markdownString = **Q${currentQuestionNumber}.**\n![Question ${currentQuestionNumber}](${pastedImageAsBase64})\n;
+    const textArea = $('#finalQuestionsText');
+    textArea.value += (textArea.value ? '\n---\n\n' : '') + markdownString;
+    textArea.scrollTop = textArea.scrollHeight;
+
+    currentQuestionNumber++;
+    $('#currentQNumLabel').textContent = currentQuestionNumber;
+    pastedImageAsBase64 = null;
+    $('#paste-preview').style.display = 'none';
+    $('#paste-text').style.display = 'block';
+    $('#paste-preview').src = '';
   });
 
   function parseAnswerKey(text) {
     const key = {};
-    const answers = text.replace(/[^A-Da-d]/g, '').split('');
+    const answers = text.split(',').map(ans => ans.trim()).filter(Boolean);
     answers.forEach((answer, index) => {
         key[index + 1] = answer.toUpperCase();
     });
@@ -384,70 +388,67 @@
   }
   
   // --- Screenshot/Cropping Logic ---
+  const cropModeBtn = $('#cropModeBtn');
+  const pdfPreview = $('#pdf-preview');
   const cropOverlay = $('#crop-overlay');
   const cropVisualizer = $('#crop-visualizer');
   const cropCtx = cropVisualizer.getContext('2d');
+  let isCropMode = false;
   let isDrawingCrop = false;
   let cropStart = { x: 0, y: 0 };
-  
-  function resizeCropVisualizer() {
-      const container = $('#pdf-preview-pages');
-      cropVisualizer.width = container.scrollWidth;
-      cropVisualizer.height = container.scrollHeight;
-      cropOverlay.style.height = `${container.scrollHeight}px`;
-  }
-  new ResizeObserver(resizeCropVisualizer).observe($('#pdf-preview-pages'));
 
-  const getEventCoords = (e) => {
-      const rect = cropOverlay.getBoundingClientRect();
-      return {
-          x: e.clientX - rect.left + cropOverlay.parentElement.parentElement.scrollLeft,
-          y: e.clientY - rect.top + cropOverlay.parentElement.parentElement.scrollTop
-      };
-  };
-  
-  const startDrag = (e) => {
-      if (e.button !== 0) return; // Only process left-clicks
-      e.preventDefault();
-      
-      isDrawingCrop = true;
-      const coords = getEventCoords(e);
-      cropStart.x = coords.x;
-      cropStart.y = coords.y;
+  cropModeBtn.addEventListener('click', () => {
+      isCropMode = !isCropMode;
+      if (isCropMode) {
+          cropModeBtn.textContent = 'Cancel Selection';
+          cropModeBtn.classList.replace('bg-green-500', 'bg-red-500');
+          cropModeBtn.classList.replace('hover:bg-green-600', 'hover:bg-red-600');
+          cropOverlay.style.display = 'block';
+          resizeCropVisualizer();
+      } else {
+          cancelCropping();
+      }
+  });
 
-      document.addEventListener('mousemove', drag);
-      document.addEventListener('mouseup', endDrag);
-  };
-
-  const drag = (e) => {
-      if (!isDrawingCrop) return;
-      e.preventDefault();
-      const current = getEventCoords(e);
-      
-      requestAnimationFrame(() => {
-        cropCtx.clearRect(0, 0, cropVisualizer.width, cropVisualizer.height);
-        cropCtx.fillStyle = 'rgba(0, 100, 255, 0.3)';
-        cropCtx.fillRect(cropStart.x, cropStart.y, current.x - cropStart.x, current.y - cropStart.y);
-        cropCtx.strokeStyle = 'rgba(0, 100, 255, 0.8)';
-        cropCtx.strokeRect(cropStart.x, cropStart.y, current.x - cropStart.x, current.y - cropStart.y);
-      });
-  };
-  
-  const endDrag = (e) => {
-      if (!isDrawingCrop) return;
-      e.preventDefault();
+  function cancelCropping() {
+      isCropMode = false;
       isDrawingCrop = false;
-      document.removeEventListener('mousemove', drag);
-      document.removeEventListener('mouseup', endDrag);
-      captureSelection(e);
+      cropModeBtn.textContent = 'Select Question Area';
+      cropModeBtn.classList.replace('bg-red-500', 'bg-green-500');
+      cropModeBtn.classList.replace('hover:bg-red-600', 'hover:bg-green-600');
+      cropOverlay.style.display = 'none';
   }
 
-  cropOverlay.addEventListener('mousedown', startDrag);
+  function resizeCropVisualizer() {
+      cropVisualizer.width = cropOverlay.clientWidth;
+      cropVisualizer.height = cropOverlay.clientHeight;
+  }
+  new ResizeObserver(resizeCropVisualizer).observe(cropOverlay);
 
-  function captureSelection(e) {
-      const cropEnd = getEventCoords(e);
+  cropOverlay.addEventListener('mousedown', (e) => {
+      isDrawingCrop = true;
+      cropStart.x = e.offsetX;
+      cropStart.y = e.offsetY;
+  });
+
+  cropOverlay.addEventListener('mousemove', (e) => {
+      if (!isDrawingCrop) return;
+      const currentX = e.offsetX;
+      const currentY = e.offsetY;
+      
       cropCtx.clearRect(0, 0, cropVisualizer.width, cropVisualizer.height);
+      cropCtx.fillStyle = 'rgba(0, 100, 255, 0.3)';
+      cropCtx.fillRect(cropStart.x, cropStart.y, currentX - cropStart.x, currentY - cropStart.y);
+      cropCtx.strokeStyle = 'rgba(0, 100, 255, 0.8)';
+      cropCtx.strokeRect(cropStart.x, cropStart.y, currentX - cropStart.x, currentY - cropStart.y);
+  });
 
+  cropOverlay.addEventListener('mouseup', (e) => {
+      if (!isDrawingCrop) return;
+      isDrawingCrop = false;
+
+      const cropEnd = { x: e.offsetX, y: e.offsetY };
+      
       const rect = {
           x: Math.min(cropStart.x, cropEnd.x),
           y: Math.min(cropStart.y, cropEnd.y),
@@ -455,58 +456,70 @@
           height: Math.abs(cropStart.y - cropEnd.y)
       };
 
-      if (rect.width < 10 || rect.height < 10) return;
+      if (rect.width < 10 || rect.height < 10) {
+          cancelCropping();
+          return;
+      }
       
       const pdfCanvases = [...$('#pdf-preview-pages').querySelectorAll('canvas')];
+      let sourceCanvas = null;
+
+      const clickPoint = {
+          x: cropOverlay.getBoundingClientRect().left + rect.x,
+          y: cropOverlay.getBoundingClientRect().top + rect.y,
+      };
+
+      for (const canvas of pdfCanvases) {
+          const canvasRect = canvas.getBoundingClientRect();
+          if (
+              clickPoint.x >= canvasRect.left && clickPoint.x <= canvasRect.right &&
+              clickPoint.y >= canvasRect.top && clickPoint.y <= canvasRect.bottom
+          ) {
+              sourceCanvas = canvas;
+              break;
+          }
+      }
+
+      if (!sourceCanvas) {
+          alert('Selection must be made over a PDF page.');
+          cancelCropping();
+          return;
+      }
       
-      const totalHeight = pdfCanvases.reduce((h, c) => h + c.height, 0);
-      const maxWidth = Math.max(...pdfCanvases.map(c => c.width));
-      const combinedCanvas = document.createElement('canvas');
-      combinedCanvas.width = maxWidth;
-      combinedCanvas.height = totalHeight;
-      const combinedCtx = combinedCanvas.getContext('2d');
-      let currentY = 0;
-      pdfCanvases.forEach(c => {
-          combinedCtx.drawImage(c, 0, currentY);
-          currentY += c.height;
-      });
+      const sourceRect = sourceCanvas.getBoundingClientRect();
+      const scale = sourceCanvas.width / sourceRect.width;
+
+      const sx = (clickPoint.x - sourceRect.left) * scale;
+      const sy = (clickPoint.y - sourceRect.top) * scale;
+      const sWidth = rect.width * scale;
+      const sHeight = rect.height * scale;
       
       const tempCanvas = document.createElement('canvas');
-      tempCanvas.width = rect.width;
-      tempCanvas.height = rect.height;
+      tempCanvas.width = sWidth;
+      tempCanvas.height = sHeight;
       const tempCtx = tempCanvas.getContext('2d');
 
       tempCtx.drawImage(
-          combinedCanvas,
-          rect.x, rect.y, rect.width, rect.height,
-          0, 0, rect.width, rect.height
+          sourceCanvas,
+          sx, sy, sWidth, sHeight,
+          0, 0, sWidth, sHeight
       );
       
       pastedImageAsBase64 = tempCanvas.toDataURL('image/png');
-      isFromCrop = true;
       $('#paste-preview').src = pastedImageAsBase64;
       $('#paste-preview').style.display = 'block';
       $('#paste-text').style.display = 'none';
+      
+      cancelCropping();
+  });
 
-      addPastedQuestion(); // Automatically add after crop
-  }
-  
-  // Auto-add on Right Click or Enter for PASTED images only
-  document.getElementById('correction-section').addEventListener('contextmenu', (e) => {
-      if (pastedImageAsBase64 && !isFromCrop) {
-          e.preventDefault();
-          addPastedQuestion();
+  cropOverlay.addEventListener('mouseleave', () => {
+      if(isDrawingCrop) {
+          isDrawingCrop = false;
+          cropCtx.clearRect(0, 0, cropVisualizer.width, cropVisualizer.height);
       }
   });
 
-  document.addEventListener('keydown', (e) => {
-      if ($('#correction-section').style.display !== 'none' && e.key === 'Enter') {
-          if (pastedImageAsBase64 && !isFromCrop) {
-              e.preventDefault();
-              addPastedQuestion();
-          }
-      }
-  });
 
   // Initial Setup
   signInAnonymously(auth).then(() => {
@@ -522,4 +535,3 @@
 </script>
 </body>
 </html>
-
