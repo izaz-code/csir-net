@@ -15,6 +15,15 @@
       background-color: rgba(0, 0, 0, 0.5); z-index: 9999;
       display: flex; align-items: center; justify-content: center;
     }
+    #crop-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        cursor: crosshair;
+        z-index: 10;
+    }
   </style>
 </head>
 <body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
@@ -33,7 +42,7 @@
         <input type="number" id="totalDuration" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm" placeholder="e.g., 180">
       </div>
       <div>
-        <label for="negativeWeightage" class="block text-sm font-medium text-gray-700">Negative Weightage (e.g., 0.25 of mark)</label>
+        <label for="negativeWeightage" class="block text-sm font-medium text-gray-700">Negative Weightage (e.g., 0.25 for 1/4)</label>
         <input type="number" step="0.01" id="negativeWeightage" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm" placeholder="e.g., 0.25">
       </div>
       <div>
@@ -58,11 +67,11 @@
   <div class="mb-6">
     <h2 class="text-xl font-semibold text-gray-700 mb-4">3. Upload Paper</h2>
     <div>
-      <label for="questionFile" class="block text-sm font-medium text-gray-700 mb-1">Question Paper (.pdf, .txt, .md)</label>
+      <label for="questionFile" class="block text-sm font-medium text-gray-700 mb-1">Question Paper (.pdf)</label>
       <label class="w-full flex items-center px-4 py-2 bg-white text-blue-500 rounded-lg shadow-sm tracking-wide uppercase border border-blue-500 cursor-pointer hover:bg-blue-500 hover:text-white">
         <svg class="w-6 h-6 mr-2" fill="currentColor" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M16.88 9.1A4 4 0 0 1 16 17H5a5 5 0 0 1-1-9.9V7a3 3 0 0 1 4.52-2.59A4.98 4.98 0 0 1 17 8c0 .38-.04.74-.12 1.1zM11 11h3l-4 4-4-4h3V3h2v8z" /></svg>
         <span id="fileName" class="truncate">Select a file</span>
-        <input type='file' id="questionFile" class="hidden" accept=".txt,.md,.pdf"/>
+        <input type='file' id="questionFile" class="hidden" accept=".pdf"/>
       </label>
     </div>
   </div>
@@ -79,19 +88,28 @@
   <h1 class="text-2xl font-bold text-gray-800 mb-2">Preview & Construct Questions</h1>
   <div class="p-4 bg-yellow-50 border-l-4 border-yellow-400 text-yellow-800 mb-4 rounded-r-lg">
     <p class="font-bold">Instructions</p>
-    <p class="mt-1">If your PDF is a scanned image, the text area on the right will be empty. Please construct the quiz by taking a screenshot of each question from the PDF preview and pasting it into the constructor box below.</p>
+    <p class="mt-1">Use your **left mouse button** to drag a box over a question. Release to automatically capture and add it to the list. For pasted images, use **right-click** or press **Enter** to add.</p>
   </div>
   <div class="grid grid-cols-1 md:grid-cols-2 gap-6 h-[75vh]">
-    <div id="pdf-preview" class="border rounded-md p-2 overflow-auto bg-gray-50">
-      <h3 class="font-bold text-lg mb-2 text-center">PDF Preview</h3>
-      <div id="pdf-preview-pages"></div>
+    <div class="flex flex-col">
+        <div class="flex justify-between items-center mb-2">
+             <h3 class="font-bold text-lg">PDF Preview</h3>
+        </div>
+      	<div id="pdf-preview" class="relative border rounded-md p-2 overflow-auto bg-gray-50 flex-grow">
+      	    <div id="pdf-preview-pages" class="relative">
+                 <!-- Canvases will be added here -->
+                 <div id="crop-overlay" style="position: absolute; top:0; left: 0; width: 100%; height: 100%; cursor: crosshair;">
+                    <canvas id="crop-visualizer" style="position: absolute; top: 0; left: 0;"></canvas>
+                </div>
+            </div>
+      	</div>
     </div>
     <div id="text-editor" class="flex flex-col">
       <div id="question-constructor" class="mb-4 p-4 border rounded-lg bg-gray-50">
         <h3 class="font-bold text-lg mb-2">Question Constructor</h3>
-        <p class="text-sm text-gray-600 mb-4">Paste a screenshot of a single question (including options) into the box below (`Ctrl+V`). Then press Enter or click the button to add it.</p>
+        <p class="text-sm text-gray-600 mb-4">The captured image will appear below. You can also paste an image directly (`Ctrl+V`).</p>
         <div id="paste-zone" class="w-full h-24 rounded-lg flex items-center justify-center text-gray-500 bg-white cursor-pointer border-2 border-dashed border-gray-300" tabindex="0">
-          <p id="paste-text">Click here and Paste Screenshot</p>
+          <p id="paste-text">Image will appear here after selection</p>
           <img id="paste-preview" class="max-h-full max-w-full" style="display:none;" />
         </div>
         <button id="addQuestionBtn" class="mt-4 w-full bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700">Add Question <span id="currentQNumLabel" class="font-bold">1</span> to List</button>
@@ -100,7 +118,7 @@
       <textarea id="finalQuestionsText" class="w-full h-full p-2 border border-gray-300 rounded-md flex-grow"></textarea>
       <div class="mt-4">
         <label for="answerKey" class="block text-sm font-medium text-gray-700 mb-1">Answer Key (Required)</label>
-        <textarea id="answerKey" rows="3" class="w-full p-2 border border-gray-300 rounded-md" placeholder="e.g., 1:B, 2:A, 3:D, 4:C ..."></textarea>
+        <textarea id="answerKey" rows="1" class="w-full p-2 border border-gray-300 rounded-md" placeholder="e.g., BADC... (no spaces or commas)"></textarea>
       </div>
     </div>
   </div>
@@ -159,6 +177,7 @@
 
   let currentQuestionNumber = 1;
   let pastedImageAsBase64 = null;
+  let isFromCrop = false; // Flag to check if image is from cropping tool
 
   const $ = (selector) => document.querySelector(selector);
 
@@ -210,7 +229,6 @@
   $('#uploadBtn').addEventListener('click', async () => {
     $('#errorBox').style.display = 'none';
 
-    // Basic validation
     if (!$('#totalDuration').value || !$('#negativeWeightage').value || !$('#totalQuestions').value || !$('#questionFile').files[0]) {
       showError('Please fill all settings and upload a file before continuing.');
       return;
@@ -221,8 +239,7 @@
 
     try {
       const file = $('#questionFile').files[0];
-      const textContent = await (file.type === 'application/pdf' ? parsePdf(file) : readTextFile(file));
-      $('#finalQuestionsText').value = textContent;
+      await parsePdf(file);
       showScreen('correction-section');
     } catch (err) {
       showError(err.message);
@@ -291,20 +308,6 @@
   });
 
   async function parsePdf(file) {
-    await renderPdfPreview(file);
-    return ""; // For PDFs, we expect manual construction.
-  }
-
-  function readTextFile(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => resolve(e.target.result);
-      reader.onerror = () => reject(new Error('Failed to read file.'));
-      reader.readAsText(file);
-    });
-  }
-
-  async function renderPdfPreview(file) {
     const reader = new FileReader();
     reader.readAsArrayBuffer(file);
     return new Promise((resolve, reject) => {
@@ -316,7 +319,7 @@
           container.innerHTML = '';
           for (let i = 1; i <= pdf.numPages; i++) {
             const page = await pdf.getPage(i);
-            const viewport = page.getViewport({ scale: 1.5 });
+            const viewport = page.getViewport({ scale: 7.0 }); // Even higher scale for best quality
             const canvas = document.createElement('canvas');
             canvas.height = viewport.height;
             canvas.width = viewport.width;
@@ -329,7 +332,26 @@
       reader.onerror = () => reject(new Error('Failed to read PDF.'));
     });
   }
+    
+  function addPastedQuestion() {
+    if (!pastedImageAsBase64) { return; }
 
+    const markdownString = `**Q${currentQuestionNumber}.**\n![Question ${currentQuestionNumber}](${pastedImageAsBase64})\n`;
+    const textArea = $('#finalQuestionsText');
+    const currentText = textArea.value;
+    // Add separator only if there's existing content
+    textArea.value += (currentText.length > 0 && currentText.trim() !== '' ? '\n---\n\n' : '') + markdownString;
+    textArea.scrollTop = textArea.scrollHeight;
+
+    currentQuestionNumber++;
+    $('#currentQNumLabel').textContent = currentQuestionNumber;
+    pastedImageAsBase64 = null;
+    isFromCrop = false;
+    $('#paste-preview').style.display = 'none';
+    $('#paste-text').style.display = 'block';
+    $('#paste-preview').src = '';
+  }
+  
   $('#paste-zone').addEventListener('paste', (e) => {
     e.preventDefault();
     const item = e.clipboardData.items[0];
@@ -338,6 +360,7 @@
       const reader = new FileReader();
       reader.onload = function(event) {
         pastedImageAsBase64 = event.target.result;
+        isFromCrop = false;
         $('#paste-preview').src = pastedImageAsBase64;
         $('#paste-preview').style.display = 'block';
         $('#paste-text').style.display = 'none';
@@ -347,31 +370,143 @@
   });
 
   $('#addQuestionBtn').addEventListener('click', () => {
-    if (!pastedImageAsBase64) { alert('Please paste an image first.'); return; }
-
-    const markdownString = `**Q${currentQuestionNumber}.**\n![Question ${currentQuestionNumber}](${pastedImageAsBase64})\n`;
-    const textArea = $('#finalQuestionsText');
-    textArea.value += (textArea.value ? '\n---\n\n' : '') + markdownString;
-    textArea.scrollTop = textArea.scrollHeight;
-
-    currentQuestionNumber++;
-    $('#currentQNumLabel').textContent = currentQuestionNumber;
-    pastedImageAsBase64 = null;
-    $('#paste-preview').style.display = 'none';
-    $('#paste-text').style.display = 'block';
-    $('#paste-preview').src = '';
+    if (!pastedImageAsBase64) { alert('Please select an area or paste an image first.'); return; }
+    addPastedQuestion();
   });
 
   function parseAnswerKey(text) {
     const key = {};
-    text.split(',').forEach(entry => {
-      const parts = entry.split(':').map(p => p.trim());
-      if (parts.length === 2 && !isNaN(parts[0])) {
-        key[parts[0]] = parts[1].toUpperCase();
-      }
+    const answers = text.replace(/[^A-Da-d]/g, '').split('');
+    answers.forEach((answer, index) => {
+        key[index + 1] = answer.toUpperCase();
     });
     return key;
   }
+  
+  // --- Screenshot/Cropping Logic ---
+  const cropOverlay = $('#crop-overlay');
+  const cropVisualizer = $('#crop-visualizer');
+  const cropCtx = cropVisualizer.getContext('2d');
+  let isDrawingCrop = false;
+  let cropStart = { x: 0, y: 0 };
+  
+  function resizeCropVisualizer() {
+      const container = $('#pdf-preview-pages');
+      cropVisualizer.width = container.scrollWidth;
+      cropVisualizer.height = container.scrollHeight;
+      cropOverlay.style.height = `${container.scrollHeight}px`;
+  }
+  new ResizeObserver(resizeCropVisualizer).observe($('#pdf-preview-pages'));
+
+  const getEventCoords = (e) => {
+      const rect = cropOverlay.getBoundingClientRect();
+      return {
+          x: e.clientX - rect.left + cropOverlay.parentElement.parentElement.scrollLeft,
+          y: e.clientY - rect.top + cropOverlay.parentElement.parentElement.scrollTop
+      };
+  };
+  
+  const startDrag = (e) => {
+      if (e.button !== 0) return; // Only process left-clicks
+      e.preventDefault();
+      
+      isDrawingCrop = true;
+      const coords = getEventCoords(e);
+      cropStart.x = coords.x;
+      cropStart.y = coords.y;
+
+      document.addEventListener('mousemove', drag);
+      document.addEventListener('mouseup', endDrag);
+  };
+
+  const drag = (e) => {
+      if (!isDrawingCrop) return;
+      e.preventDefault();
+      const current = getEventCoords(e);
+      
+      requestAnimationFrame(() => {
+        cropCtx.clearRect(0, 0, cropVisualizer.width, cropVisualizer.height);
+        cropCtx.fillStyle = 'rgba(0, 100, 255, 0.3)';
+        cropCtx.fillRect(cropStart.x, cropStart.y, current.x - cropStart.x, current.y - cropStart.y);
+        cropCtx.strokeStyle = 'rgba(0, 100, 255, 0.8)';
+        cropCtx.strokeRect(cropStart.x, cropStart.y, current.x - cropStart.x, current.y - cropStart.y);
+      });
+  };
+  
+  const endDrag = (e) => {
+      if (!isDrawingCrop) return;
+      e.preventDefault();
+      isDrawingCrop = false;
+      document.removeEventListener('mousemove', drag);
+      document.removeEventListener('mouseup', endDrag);
+      captureSelection(e);
+  }
+
+  cropOverlay.addEventListener('mousedown', startDrag);
+
+  function captureSelection(e) {
+      const cropEnd = getEventCoords(e);
+      cropCtx.clearRect(0, 0, cropVisualizer.width, cropVisualizer.height);
+
+      const rect = {
+          x: Math.min(cropStart.x, cropEnd.x),
+          y: Math.min(cropStart.y, cropEnd.y),
+          width: Math.abs(cropStart.x - cropEnd.x),
+          height: Math.abs(cropStart.y - cropEnd.y)
+      };
+
+      if (rect.width < 10 || rect.height < 10) return;
+      
+      const pdfCanvases = [...$('#pdf-preview-pages').querySelectorAll('canvas')];
+      
+      const totalHeight = pdfCanvases.reduce((h, c) => h + c.height, 0);
+      const maxWidth = Math.max(...pdfCanvases.map(c => c.width));
+      const combinedCanvas = document.createElement('canvas');
+      combinedCanvas.width = maxWidth;
+      combinedCanvas.height = totalHeight;
+      const combinedCtx = combinedCanvas.getContext('2d');
+      let currentY = 0;
+      pdfCanvases.forEach(c => {
+          combinedCtx.drawImage(c, 0, currentY);
+          currentY += c.height;
+      });
+      
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = rect.width;
+      tempCanvas.height = rect.height;
+      const tempCtx = tempCanvas.getContext('2d');
+
+      tempCtx.drawImage(
+          combinedCanvas,
+          rect.x, rect.y, rect.width, rect.height,
+          0, 0, rect.width, rect.height
+      );
+      
+      pastedImageAsBase64 = tempCanvas.toDataURL('image/png');
+      isFromCrop = true;
+      $('#paste-preview').src = pastedImageAsBase64;
+      $('#paste-preview').style.display = 'block';
+      $('#paste-text').style.display = 'none';
+
+      addPastedQuestion(); // Automatically add after crop
+  }
+  
+  // Auto-add on Right Click or Enter for PASTED images only
+  document.getElementById('correction-section').addEventListener('contextmenu', (e) => {
+      if (pastedImageAsBase64 && !isFromCrop) {
+          e.preventDefault();
+          addPastedQuestion();
+      }
+  });
+
+  document.addEventListener('keydown', (e) => {
+      if ($('#correction-section').style.display !== 'none' && e.key === 'Enter') {
+          if (pastedImageAsBase64 && !isFromCrop) {
+              e.preventDefault();
+              addPastedQuestion();
+          }
+      }
+  });
 
   // Initial Setup
   signInAnonymously(auth).then(() => {
@@ -387,3 +522,4 @@
 </script>
 </body>
 </html>
+
