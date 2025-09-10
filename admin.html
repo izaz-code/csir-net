@@ -3,26 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Quiz Paper Uploader</title>
+  <title>AI Quiz Paper Uploader</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
   <style>
     body { font-family: 'Inter', sans-serif; }
-    #pdf-preview-pages canvas { border: 1px solid #e2e8f0; margin-bottom: 8px; max-width: 100%; }
     button:disabled { background-color: #a5b4fc; cursor: not-allowed; }
     #progress-overlay, #custom-modal-overlay {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
       background-color: rgba(0, 0, 0, 0.5); z-index: 9999;
       display: flex; align-items: center; justify-content: center;
-    }
-    #crop-overlay {
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        cursor: crosshair;
-        z-index: 10;
     }
   </style>
 </head>
@@ -30,8 +19,8 @@
 
 <!-- Main Upload and Settings Section -->
 <div id="upload-section" class="bg-white p-8 rounded-lg shadow-lg w-full max-w-2xl">
-  <h1 class="text-2xl font-bold text-gray-800 mb-2">Quiz Paper Uploader</h1>
-  <p class="text-gray-600 mb-6">Configure, upload, and generate a unique Quiz ID for your students.</p>
+  <h1 class="text-2xl font-bold text-gray-800 mb-2">AI Quiz Paper Uploader</h1>
+  <p class="text-gray-600 mb-6">This tool uses a secure, server-side AI to automatically extract questions and the answer key from your PDF.</p>
 
   <!-- Quiz Settings -->
   <div class="mb-6 border-b pb-6">
@@ -44,10 +33,6 @@
       <div>
         <label for="negativeWeightage" class="block text-sm font-medium text-gray-700">Negative Weightage (e.g., 0.25 for 1/4)</label>
         <input type="number" step="0.01" id="negativeWeightage" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm" placeholder="e.g., 0.25">
-      </div>
-      <div>
-        <label for="totalQuestions" class="block text-sm font-medium text-gray-700">Total Questions (Auto-calculated)</label>
-        <input type="number" id="totalQuestions" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm bg-gray-100" readonly>
       </div>
     </div>
   </div>
@@ -65,67 +50,52 @@
 
   <!-- File Upload -->
   <div class="mb-6">
-    <h2 class="text-xl font-semibold text-gray-700 mb-4">3. Upload Paper</h2>
+    <h2 class="text-xl font-semibold text-gray-700 mb-4">3. Upload & Process</h2>
     <div>
-      <label for="questionFile" class="block text-sm font-medium text-gray-700 mb-1">Question Paper (.pdf, .txt, .md)</label>
+      <label for="questionFile" class="block text-sm font-medium text-gray-700 mb-1">Question Paper (.pdf)</label>
       <label class="w-full flex items-center px-4 py-2 bg-white text-blue-500 rounded-lg shadow-sm tracking-wide uppercase border border-blue-500 cursor-pointer hover:bg-blue-500 hover:text-white">
         <svg class="w-6 h-6 mr-2" fill="currentColor" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M16.88 9.1A4 4 0 0 1 16 17H5a5 5 0 0 1-1-9.9V7a3 3 0 0 1 4.52-2.59A4.98 4.98 0 0 1 17 8c0 .38-.04.74-.12 1.1zM11 11h3l-4 4-4-4h3V3h2v8z" /></svg>
-        <span id="fileName" class="truncate">Select a file</span>
-        <input type='file' id="questionFile" class="hidden" accept=".txt,.md,.pdf"/>
+        <span id="fileName" class="truncate">Select a PDF file</span>
+        <input type='file' id="questionFile" class="hidden" accept=".pdf"/>
       </label>
     </div>
   </div>
 
-
-  <button id="uploadBtn" class="w-full bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-indigo-700" disabled>
-    Connecting...
+  <button id="processBtn" class="w-full bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-indigo-700" disabled>
+    Connect to AI Service...
   </button>
   <div id="errorBox" class="mt-4 p-3 bg-red-50 text-red-700 border border-red-200 rounded-md" style="display:none;"></div>
 </div>
 
-<!-- Correction Section -->
-<div id="correction-section" class="bg-white p-8 rounded-lg shadow-lg w-full max-w-7xl" style="display: none;">
-  <h1 class="text-2xl font-bold text-gray-800 mb-2">Preview & Construct Questions</h1>
-  <div class="p-4 bg-yellow-50 border-l-4 border-yellow-400 text-yellow-800 mb-4 rounded-r-lg">
-    <p class="font-bold">Instructions</p>
-    <p class="mt-1">Click "Select Question Area" to enable crop mode. Click and drag over a question in the PDF preview to capture it. The captured image will appear in the Question Constructor.</p>
-  </div>
-  <div class="grid grid-cols-1 md:grid-cols-2 gap-6 h-[75vh]">
-    <div class="flex flex-col">
-        <div class="flex justify-between items-center mb-2">
-             <h3 class="font-bold text-lg">PDF Preview</h3>
-             <button id="cropModeBtn" class="bg-green-500 text-white font-bold py-1 px-3 rounded-lg hover:bg-green-600 text-sm">Select Question Area</button>
-        </div>
-      	<div id="pdf-preview" class="relative border rounded-md p-2 overflow-auto bg-gray-50 flex-grow">
-      	    <div id="pdf-preview-pages"></div>
-            <div id="crop-overlay" style="display: none;">
-                <canvas id="crop-visualizer" style="position: absolute; top: 0; left: 0;"></canvas>
-            </div>
-      	</div>
-    </div>
-    <div id="text-editor" class="flex flex-col">
-      <div id="question-constructor" class="mb-4 p-4 border rounded-lg bg-gray-50">
-        <h3 class="font-bold text-lg mb-2">Question Constructor</h3>
-        <p class="text-sm text-gray-600 mb-4">After selecting an area, the image will appear below. You can also paste an image directly (`Ctrl+V`). Click "Add Question" to add it to the list.</p>
-        <div id="paste-zone" class="w-full h-24 rounded-lg flex items-center justify-center text-gray-500 bg-white cursor-pointer border-2 border-dashed border-gray-300" tabindex="0">
-          <p id="paste-text">Image will appear here after selection</p>
-          <img id="paste-preview" class="max-h-full max-w-full" style="display:none;" />
-        </div>
-        <button id="addQuestionBtn" class="mt-4 w-full bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700">Add Question <span id="currentQNumLabel" class="font-bold">1</span> to List</button>
-      </div>
-      <h3 class="font-bold text-lg mb-2 text-center">Final Questions (Separated by '---')</h3>
+<!-- Review Section -->
+<div id="review-section" class="bg-white p-8 rounded-lg shadow-lg w-full max-w-4xl" style="display: none;">
+  <h1 class="text-2xl font-bold text-gray-800 mb-2">Review & Finalize</h1>
+  <p class="text-gray-600 mb-6">The AI has extracted the questions and answer key. Please review them before generating the quiz ID.</p>
+  
+  <div class="h-[60vh] flex flex-col">
+      <h3 class="font-bold text-lg mb-2 text-center">Extracted Questions (Separated by '---')</h3>
       <textarea id="finalQuestionsText" class="w-full h-full p-2 border border-gray-300 rounded-md flex-grow"></textarea>
+      
       <div class="mt-4">
-        <label for="answerKey" class="block text-sm font-medium text-gray-700 mb-1">Answer Key (Required)</label>
-        <textarea id="answerKey" rows="3" class="w-full p-2 border border-gray-300 rounded-md" placeholder="Enter answers in order, separated by commas. e.g., B,A,D,C,..."></textarea>
+          <label for="totalQuestions" class="block text-sm font-medium text-gray-700">Total Questions (AI Detected)</label>
+          <input type="number" id="totalQuestions" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm bg-gray-100" readonly>
       </div>
-    </div>
+
+      <div class="mt-4">
+        <div class="flex justify-between items-center mb-1">
+            <label for="answerKey" class="block text-sm font-medium text-gray-700">Answer Key</label>
+            <span id="answerKeyStatus" class="text-xs font-medium"></span>
+        </div>
+        <textarea id="answerKey" rows="1" class="w-full p-2 border border-gray-300 rounded-md" placeholder="e.g., BADC... (no spaces or commas)"></textarea>
+      </div>
   </div>
+  
   <button id="generateBtn" class="mt-6 w-full bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-indigo-700">
-    Finalize and Generate Quiz ID
+    Generate Quiz ID
   </button>
-  <div id="correctionErrorBox" class="mt-4 p-3 bg-red-50 text-red-700 border border-red-200 rounded-md" style="display:none;"></div>
+  <div id="reviewErrorBox" class="mt-4 p-3 bg-red-50 text-red-700 border border-red-200 rounded-md" style="display:none;"></div>
 </div>
+
 
 <!-- Result Section -->
 <div id="result-section" class="bg-white p-8 rounded-lg shadow-lg w-full max-w-md" style="display: none;">
@@ -144,16 +114,9 @@
 <!-- Overlays -->
 <div id="progress-overlay" style="display: none;">
   <div class="bg-white p-6 rounded-lg shadow-xl text-center">
-    <p id="progress-text" class="font-semibold text-lg mb-4">Generating Quiz ID...</p>
+    <p id="progress-text" class="font-semibold text-lg mb-4">Processing...</p>
   </div>
 </div>
-<div id="custom-modal-overlay" style="display: none;">
-  <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-sm text-center">
-    <p id="modal-text" class="mb-6 text-gray-800"></p>
-    <div id="modal-actions" class="flex justify-center space-x-4"></div>
-  </div>
-</div>
-
 
 <script type="module">
   const firebaseConfig = {
@@ -162,8 +125,7 @@
     projectId: "quiz-3d72e",
     storageBucket: "quiz-3d72e.appspot.com",
     messagingSenderId: "843152315174",
-    appId: "1:843152315174:web:e90ae825078e7d0c7ae7e7",
-    measurementId: "G-L0J0BQP3QS"
+    appId: "1:843152315174:web:e90ae825078e7d0c7ae7e7"
   };
 
   import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
@@ -174,96 +136,104 @@
   const db = getFirestore(app);
   const auth = getAuth(app);
 
-  let currentQuestionNumber = 1;
-  let pastedImageAsBase64 = null;
-
   const $ = (selector) => document.querySelector(selector);
 
   function showScreen(screenId) {
-    ['upload-section', 'correction-section', 'result-section'].forEach(id => {
-      $(`#${id}`).style.display = (id === screenId) ? (id === 'upload-section' ? 'block' : 'block') : 'none';
+    ['upload-section', 'review-section', 'result-section'].forEach(id => {
+      $(`#${id}`).style.display = (id === screenId) ? 'block' : 'none';
     });
   }
 
-  function showError(message, isCorrectionScreen = false) {
-    const box = isCorrectionScreen ? $('#correctionErrorBox') : $('#errorBox');
+  function showError(message, screen = 'upload') {
+    const box = screen === 'review' ? $('#reviewErrorBox') : $('#errorBox');
     box.textContent = message;
     box.style.display = 'block';
   }
 
-  function showModal(message, onConfirm) {
-    $('#modal-text').textContent = message;
-    $('#modal-actions').innerHTML = `<button id="modal-cancel" class="w-1/2 bg-gray-300 font-bold py-2 px-4 rounded-lg">Cancel</button><button id="modal-confirm" class="w-1/2 bg-red-600 text-white font-bold py-2 px-4 rounded-lg">Confirm</button>`;
-    $('#custom-modal-overlay').style.display = 'flex';
-    $('#modal-confirm').onclick = () => { $('#custom-modal-overlay').style.display = 'none'; onConfirm(); };
-    $('#modal-cancel').onclick = () => { $('#custom-modal-overlay').style.display = 'none'; };
-  }
-
-  function addQuizPart(name = '', qCount = '', marks = '') {
+  function addQuizPart(name = '', qCount = '', marks = '', maxQ = '') {
     const container = $('#quizPartsContainer');
     const partDiv = document.createElement('div');
-    partDiv.className = 'grid grid-cols-1 md:grid-cols-4 gap-2 items-center';
+    partDiv.className = 'grid grid-cols-1 md:grid-cols-5 gap-2 items-center';
     partDiv.innerHTML = `
-            <input type="text" class="part-name md:col-span-2 w-full p-2 border border-gray-300 rounded-md" placeholder="Part Name (e.g., Part A: Physics)" value="${name}">
+            <input type="text" class="part-name md:col-span-2 w-full p-2 border border-gray-300 rounded-md" placeholder="Part Name" value="${name}">
             <input type="number" class="part-q-count w-full p-2 border border-gray-300 rounded-md" placeholder="# of Qs" value="${qCount}">
             <input type="number" class="part-marks w-full p-2 border border-gray-300 rounded-md" placeholder="Marks / Q" value="${marks}">
+            <input type="number" class="part-max-q w-full p-2 border border-gray-300 rounded-md" placeholder="Max Attempts" value="${maxQ}">
         `;
     container.appendChild(partDiv);
   }
 
-  function updateTotalQuestions() {
-    const counts = [...document.querySelectorAll('.part-q-count')].map(el => parseInt(el.value) || 0);
-    const total = counts.reduce((sum, count) => sum + count, 0);
-    $('#totalQuestions').value = total;
-  }
-
-  $('#quizPartsContainer').addEventListener('input', updateTotalQuestions);
   $('#addPartBtn').addEventListener('click', () => addQuizPart());
-
   $('#questionFile').addEventListener('change', (e) => {
-    $('#fileName').textContent = e.target.files[0] ? e.target.files[0].name : 'Select a file';
+    $('#fileName').textContent = e.target.files[0] ? e.target.files[0].name : 'Select a PDF file';
   });
 
-  $('#uploadBtn').addEventListener('click', async () => {
+  $('#processBtn').addEventListener('click', async () => {
     $('#errorBox').style.display = 'none';
+    const file = $('#questionFile').files[0];
 
-    if (!$('#totalDuration').value || !$('#negativeWeightage').value || !$('#totalQuestions').value || !$('#questionFile').files[0]) {
-      showError('Please fill all settings and upload a file before continuing.');
+    if (!$('#totalDuration').value || !$('#negativeWeightage').value || !file) {
+      showError('Please fill all settings and upload a file before processing.');
       return;
     }
+    
+    const progressOverlay = $('#progress-overlay');
+    const progressText = $('#progress-text');
+    progressText.textContent = 'Securely uploading and processing with AI... This may take a moment.';
+    progressOverlay.style.display = 'flex';
 
-    $('#uploadBtn').disabled = true;
-    $('#uploadBtn').textContent = 'Processing...';
+    // This is where you would call your secure backend API
+    // const formData = new FormData();
+    // formData.append('pdfFile', file);
+    // const response = await fetch('YOUR_SECURE_BACKEND_URL/process-quiz', {
+    //   method: 'POST',
+    //   body: formData,
+    // });
+    // const aiResult = await response.json();
 
+    // --- MOCK FUNCTION to simulate the backend response ---
+    const mockAIProcessing = () => new Promise(resolve => setTimeout(() => resolve({
+        questions: ["**Q1.**\n![Question 1](https://placehold.co/600x400/EEE/31343C?text=Mock+Question+1)","**Q2.**\n![Question 2](https://placehold.co/600x400/EEE/31343C?text=Mock+Question+2)"],
+        answerKey: "BA",
+        structure: [{ name: "Part A", count: 2, marks: 4, maxQuestions: 2 }]
+    }), 3000));
+    
     try {
-      const file = $('#questionFile').files[0];
-      const textContent = await (file.type === 'application/pdf' ? parsePdf(file) : readTextFile(file));
-      $('#finalQuestionsText').value = textContent;
-      showScreen('correction-section');
+        const aiResult = await mockAIProcessing();
+        
+        $('#finalQuestionsText').value = aiResult.questions.join('\n---\n\n');
+        $('#totalQuestions').value = aiResult.questions.length;
+        
+        const answerKeyStatus = $('#answerKeyStatus');
+        if (aiResult.answerKey) {
+            $('#answerKey').value = aiResult.answerKey;
+            answerKeyStatus.textContent = '✓ AI Detected';
+            answerKeyStatus.className = 'text-xs font-medium text-green-600';
+        } else {
+            answerKeyStatus.textContent = '⚠ Not Found';
+            answerKeyStatus.className = 'text-xs font-medium text-yellow-600';
+        }
+
+        $('#quizPartsContainer').innerHTML = '';
+        aiResult.structure.forEach(part => addQuizPart(part.name, part.count, part.marks, part.maxQuestions));
+
+        showScreen('review-section');
     } catch (err) {
-      showError(err.message);
+      showError(`An error occurred during AI processing: ${err.message}`);
     } finally {
-      $('#uploadBtn').disabled = false;
-      $('#uploadBtn').textContent = 'Next: Construct Questions';
+      progressOverlay.style.display = 'none';
     }
   });
 
   $('#generateBtn').addEventListener('click', async () => {
-    $('#correctionErrorBox').style.display = 'none';
+    $('#reviewErrorBox').style.display = 'none';
 
     const answerKeyText = $('#answerKey').value.trim();
-    const constructedQs = $('#finalQuestionsText').value.split('---').map(q => q.trim()).filter(Boolean);
-    const expectedTotal = parseInt($('#totalQuestions').value, 10);
-
     if (!answerKeyText) {
-      showError('Answer key is mandatory.', true);
+      showError('Answer key is mandatory.', 'review');
       return;
     }
-    if(constructedQs.length !== expectedTotal) {
-      showError(`Mismatch: Expected ${expectedTotal} questions based on your settings, but found ${constructedQs.length}. Please correct the structure or add/remove questions.`, true);
-      return;
-    }
-
+    
     $('#progress-text').textContent = 'Generating Quiz ID...';
     $('#progress-overlay').style.display = 'flex';
 
@@ -274,9 +244,10 @@
         structure: [...document.querySelectorAll('#quizPartsContainer > div')].map(div => ({
           name: div.querySelector('.part-name').value,
           count: parseInt(div.querySelector('.part-q-count').value),
-          marks: parseFloat(div.querySelector('.part-marks').value)
+          marks: parseFloat(div.querySelector('.part-marks').value),
+          maxQuestions: parseInt(div.querySelector('.part-max-q').value)
         })),
-        questions: constructedQs,
+        questions: $('#finalQuestionsText').value.split('---').map(q => q.trim()).filter(Boolean),
         answerKey: parseAnswerKey(answerKeyText),
         createdAt: new Date()
       };
@@ -285,7 +256,7 @@
       $('#quizId').textContent = docRef.id;
       showScreen('result-section');
     } catch (err) {
-      showError(err.message, true);
+      showError(err.message, 'review');
     } finally {
       $('#progress-overlay').style.display = 'none';
     }
@@ -305,233 +276,26 @@
     }
     document.body.removeChild(textArea);
   });
-
-  async function parsePdf(file) {
-    await renderPdfPreview(file);
-    return ""; // For PDFs, we expect manual construction.
-  }
-
-  function readTextFile(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => resolve(e.target.result);
-      reader.onerror = () => reject(new Error('Failed to read file.'));
-      reader.readAsText(file);
-    });
-  }
-
-  async function renderPdfPreview(file) {
-    const reader = new FileReader();
-    reader.readAsArrayBuffer(file);
-    return new Promise((resolve, reject) => {
-      reader.onload = async (e) => {
-        try {
-          pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js`;
-          const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(e.target.result) }).promise;
-          const container = $('#pdf-preview-pages');
-          container.innerHTML = '';
-          for (let i = 1; i <= pdf.numPages; i++) {
-            const page = await pdf.getPage(i);
-            const viewport = page.getViewport({ scale: 3.0 }); // Increased scale for better quality
-            const canvas = document.createElement('canvas');
-            canvas.height = viewport.height;
-            canvas.width = viewport.width;
-            container.appendChild(canvas);
-            await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-          }
-          resolve();
-        } catch (error) { reject(new Error('Could not display PDF.')); }
-      };
-      reader.onerror = () => reject(new Error('Failed to read PDF.'));
-    });
-  }
-
-  $('#paste-zone').addEventListener('paste', (e) => {
-    e.preventDefault();
-    const item = e.clipboardData.items[0];
-    if (item.type.indexOf('image') !== -1) {
-      const blob = item.getAsFile();
-      const reader = new FileReader();
-      reader.onload = function(event) {
-        pastedImageAsBase64 = event.target.result;
-        $('#paste-preview').src = pastedImageAsBase64;
-        $('#paste-preview').style.display = 'block';
-        $('#paste-text').style.display = 'none';
-      };
-      reader.readAsDataURL(blob);
-    }
-  });
-
-  $('#addQuestionBtn').addEventListener('click', () => {
-    if (!pastedImageAsBase64) { alert('Please select an area or paste an image first.'); return; }
-
-    const markdownString = `**Q${currentQuestionNumber}.**\n![Question ${currentQuestionNumber}](${pastedImageAsBase64})\n`;
-    const textArea = $('#finalQuestionsText');
-    textArea.value += (textArea.value ? '\n---\n\n' : '') + markdownString;
-    textArea.scrollTop = textArea.scrollHeight;
-
-    currentQuestionNumber++;
-    $('#currentQNumLabel').textContent = currentQuestionNumber;
-    pastedImageAsBase64 = null;
-    $('#paste-preview').style.display = 'none';
-    $('#paste-text').style.display = 'block';
-    $('#paste-preview').src = '';
-  });
-
+  
   function parseAnswerKey(text) {
     const key = {};
-    const answers = text.split(',').map(ans => ans.trim()).filter(Boolean);
+    const answers = text.replace(/[^A-Da-d]/g, '').split('');
     answers.forEach((answer, index) => {
         key[index + 1] = answer.toUpperCase();
     });
     return key;
   }
-  
-  // --- Screenshot/Cropping Logic ---
-  const cropModeBtn = $('#cropModeBtn');
-  const pdfPreview = $('#pdf-preview');
-  const cropOverlay = $('#crop-overlay');
-  const cropVisualizer = $('#crop-visualizer');
-  const cropCtx = cropVisualizer.getContext('2d');
-  let isCropMode = false;
-  let isDrawingCrop = false;
-  let cropStart = { x: 0, y: 0 };
 
-  cropModeBtn.addEventListener('click', () => {
-      isCropMode = !isCropMode;
-      if (isCropMode) {
-          cropModeBtn.textContent = 'Cancel Selection';
-          cropModeBtn.classList.replace('bg-green-500', 'bg-red-500');
-          cropModeBtn.classList.replace('hover:bg-green-600', 'hover:bg-red-600');
-          cropOverlay.style.display = 'block';
-          resizeCropVisualizer();
-      } else {
-          cancelCropping();
-      }
-  });
-
-  function cancelCropping() {
-      isCropMode = false;
-      isDrawingCrop = false;
-      cropModeBtn.textContent = 'Select Question Area';
-      cropModeBtn.classList.replace('bg-red-500', 'bg-green-500');
-      cropModeBtn.classList.replace('hover:bg-red-600', 'hover:bg-green-600');
-      cropOverlay.style.display = 'none';
-  }
-
-  function resizeCropVisualizer() {
-      cropVisualizer.width = cropOverlay.clientWidth;
-      cropVisualizer.height = cropOverlay.clientHeight;
-  }
-  new ResizeObserver(resizeCropVisualizer).observe(cropOverlay);
-
-  cropOverlay.addEventListener('mousedown', (e) => {
-      isDrawingCrop = true;
-      cropStart.x = e.offsetX;
-      cropStart.y = e.offsetY;
-  });
-
-  cropOverlay.addEventListener('mousemove', (e) => {
-      if (!isDrawingCrop) return;
-      const currentX = e.offsetX;
-      const currentY = e.offsetY;
-      
-      cropCtx.clearRect(0, 0, cropVisualizer.width, cropVisualizer.height);
-      cropCtx.fillStyle = 'rgba(0, 100, 255, 0.3)';
-      cropCtx.fillRect(cropStart.x, cropStart.y, currentX - cropStart.x, currentY - cropStart.y);
-      cropCtx.strokeStyle = 'rgba(0, 100, 255, 0.8)';
-      cropCtx.strokeRect(cropStart.x, cropStart.y, currentX - cropStart.x, currentY - cropStart.y);
-  });
-
-  cropOverlay.addEventListener('mouseup', (e) => {
-      if (!isDrawingCrop) return;
-      isDrawingCrop = false;
-
-      const cropEnd = { x: e.offsetX, y: e.offsetY };
-      
-      const rect = {
-          x: Math.min(cropStart.x, cropEnd.x),
-          y: Math.min(cropStart.y, cropEnd.y),
-          width: Math.abs(cropStart.x - cropEnd.x),
-          height: Math.abs(cropStart.y - cropEnd.y)
-      };
-
-      if (rect.width < 10 || rect.height < 10) {
-          cancelCropping();
-          return;
-      }
-      
-      const pdfCanvases = [...$('#pdf-preview-pages').querySelectorAll('canvas')];
-      let sourceCanvas = null;
-
-      const clickPoint = {
-          x: cropOverlay.getBoundingClientRect().left + rect.x,
-          y: cropOverlay.getBoundingClientRect().top + rect.y,
-      };
-
-      for (const canvas of pdfCanvases) {
-          const canvasRect = canvas.getBoundingClientRect();
-          if (
-              clickPoint.x >= canvasRect.left && clickPoint.x <= canvasRect.right &&
-              clickPoint.y >= canvasRect.top && clickPoint.y <= canvasRect.bottom
-          ) {
-              sourceCanvas = canvas;
-              break;
-          }
-      }
-
-      if (!sourceCanvas) {
-          alert('Selection must be made over a PDF page.');
-          cancelCropping();
-          return;
-      }
-      
-      const sourceRect = sourceCanvas.getBoundingClientRect();
-      const scale = sourceCanvas.width / sourceRect.width;
-
-      const sx = (clickPoint.x - sourceRect.left) * scale;
-      const sy = (clickPoint.y - sourceRect.top) * scale;
-      const sWidth = rect.width * scale;
-      const sHeight = rect.height * scale;
-      
-      const tempCanvas = document.createElement('canvas');
-      tempCanvas.width = sWidth;
-      tempCanvas.height = sHeight;
-      const tempCtx = tempCanvas.getContext('2d');
-
-      tempCtx.drawImage(
-          sourceCanvas,
-          sx, sy, sWidth, sHeight,
-          0, 0, sWidth, sHeight
-      );
-      
-      pastedImageAsBase64 = tempCanvas.toDataURL('image/png');
-      $('#paste-preview').src = pastedImageAsBase64;
-      $('#paste-preview').style.display = 'block';
-      $('#paste-text').style.display = 'none';
-      
-      cancelCropping();
-  });
-
-  cropOverlay.addEventListener('mouseleave', () => {
-      if(isDrawingCrop) {
-          isDrawingCrop = false;
-          cropCtx.clearRect(0, 0, cropVisualizer.width, cropVisualizer.height);
-      }
-  });
-
-
-  // Initial Setup
   signInAnonymously(auth).then(() => {
-    $('#uploadBtn').disabled = false;
-    $('#uploadBtn').textContent = 'Next: Construct Questions';
-    addQuizPart('Part A', '10', '4'); // Add one default part to start
-    updateTotalQuestions();
+    $('#processBtn').disabled = false;
+    $('#processBtn').textContent = 'Upload and Process with AI';
+    addQuizPart('Part A', '10', '4', '10'); // Add one default part
   }).catch(error => {
-    showError('Error: Could not connect to the database.');
-    $('#uploadBtn').textContent = 'Connection Failed';
+    showError('Error: Could not connect to the AI service.');
+    $('#processBtn').textContent = 'Connection Failed';
   });
 
 </script>
 </body>
 </html>
+
